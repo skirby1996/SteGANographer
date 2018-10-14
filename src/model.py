@@ -1,61 +1,102 @@
 import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.optimizers import SGD
 import numpy as np
+import keras
+
+
+def random_boolean_batch(batch_size, n):
+    '''
+    Arguments:
+        batch_size: Number of arrays to return
+        n: Length in random boolean batch
+    Returns:
+        batch: A [batch_size, n] array of (-1./1.) boolean numbers
+    '''
+
+    batch = tf.random_uniform(
+        [batch_size, n], minval=0, maxval=2, dtype=tf.int32)
+    batch = (batch * 2) - 1
+    return tf.cast(batch, tf.float32)
+
+
+def get_batch(batch_size, msg_size, key_size):
+    '''
+    Arguments:
+        batch_size: Number of messages and keys to generate
+        msg_size: Bit length of each message
+        key_size: Bit length of each key
+    Returns:
+        msg_batch: A [batch_size, msg_size] array of (-1./1.) boolean values
+        key_batch: A [batch_size, key_size] array of (-1./1.) boolean values
+    '''
+    msg_batch = random_boolean_batch(batch_size, msg_size)
+    key_batch = random_boolean_batch(batch_size, key_size)
+
+    return msg_batch, key_batch
 
 
 class StegoNet(object):
-    def __init__(self, sess, msg_len=MSG_LEN, key_len=KEY_LEN,
-                 batch_size=BATCH_SIZE, epochs=NUM_EPOCHS,
-                 learning_rate=LEARNING_RATE):
+    def model(self, collection, msg, key=None):
+        if key is not None:
+            msg_concat = tf.concat(axis=1, values=[msg, key])
+        else:
+            msg_concat = msg
 
-        # Initiate parameters
-        self.sess = sess
-        self.msg_len = msg_len
-        self.key_len = key_len
-        self.batch_size = batch_size
-        self.epochs = epochs
-        self.learning_rate = learning_rate
+        with tf.contrib.framework.arg_scope(
+            [tf.contrib.layers.fully_connected, tf.contrib.layers.conv2d],
+                variables_collections=[collection]):
 
-    # Prepare data
+            fc0 = tf.contrib.layers.fully_connected(
+                msg_concat,
+                self.cfg.MSG_SIZE + self.cfg.KEY_SIZE,
+                biases_initializer=tf.constant_initializer(0.),
+                activation_fn=None)
 
-    # Define models
-    def build_model(self):
-        self.alice = Sequential()
-        self.alice.add(Dense(64, input_dim=(
-            self.msg_len + self.key_len), activation='relu'))
-        self.alice.add(Dense(64, activation='relu'))
-        self.alice.add(Dense(self.msg_len, activation='sigmoid'))
+            fc0 = tf.expand_dims(fc0, 2)
 
-        self.bob = Sequential()
-        self.bob.add(Dense(64, input_dim=(
-            self.msg_len + self.key_len), activation='relu'))
-        self.bob.add(Dense(64, activation='relu'))
-        self.bob.add(Dense(self.msg_len, activation='sigmoid'))
+            conv0 = tf.contrib.layers.conv2d(
+                fc0, 2, 2, 2, 'SAME', activation_fn=tf.nn.sigmoid)
 
-        self.eve = Sequential()
-        self.eve.add(Dense(64, input_dim=(self.msg_len), activation='relu'))
-        self.eve.add(Dense(64, activation='relu'))
-        self.eve.add(Dense(self.msg_len, activation='sigmoid'))
+            conv1 = tf.contrib.layers.conv2d(
+                conv0, 2, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
-        sgd = SGD(lr=self.learning_rate, decay=1e-6,
-                  momentum=0.9, nesterov=True)
-        self.alice.compile(loss='binary_crossentropy',
-                           optimizer=sgd,
-                           metrics=['accuracy'])
+            conv2 = tf.contrib.layers.conv2d(
+                conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
 
-        self.bob.compile(loss='binary_crossentropy',
-                         optimizer=sgd,
-                         metrics=['accuracy'])
+            return tf.squeeze(conv2, 2)
 
-        self.eve.compile(loss='binary_crossentropy',
-                         optimizer=sgd,
-                         metrics=['accuracy'])
+    def __init__(self, config):
+        self.cfg = config
 
-    # Define training
-    def train(self):
-        for epoch in range(self.epochs):
-            print("Beginning epoch %d/%d" % (epoch+1, self.epochs))
-            keys = np.random.randint(2, size=(self.batch_size, self.key_len))
-            msgs = np.random.randint(2, size=(self.batch_size, self.key_len))
+        msg_batch, key_batch = get_batch(
+            self.cfg.BATCH_SIZE, self.cfg.MSG_SIZE, self.cfg.KEY_SIZE)
+        alice_out = self.model('alice', msg_batch, key_batch)
+        bob_out = self.model('bob', alice_out, key_batch)
+        eve_out = self.model('eve', alice_out, None)
+
+        self.reset_eve_vars = tf.group(
+            *[w.initializer for w in tf.get_collection('eve')]
+        )
+
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=self.cfg.LEARNING_RATE)
+
+        # Eve loss
+        eve_bits_wrong = tf.reduce_sum(
+            tf.abs((eve_out + 1.) / 2. - (msg_batch + 1.) / 2.), [1])
+        self.eve_loss = tf.reduce_sum(eve_bits_wrong)
+        self.eve_optimizer = optimizer.minimize(
+            self.eve_loss, var_list=tf.get_collection('eve'))
+
+        # Alice & bob loss
+        self.bob_bits_wrong = tf.reduce_sum(
+            tf.abs((bob_out + 1.) / 2. - (msg_batch + 1.) / 2.), [1])
+        self.bob_reconstruction_loss = tf.reduce_sum(self.bob_bits_wrong)
+        bob_eve_error_deviation = tf.abs(
+            float(self.cfg.MSG_SIZE) / 2. - eve_bits_wrong)
+        bob_eve_loss = tf.reduce_sum(
+            tf.square(bob_eve_error_deviation) / (self.cfg.MSG_SIZE / 2)**2)
+        self.bob_loss = (self.bob_reconstruction_loss /
+                         self.cfg.MSG_SIZE + bob_eve_loss)
+
+        self.bob_optimizer = optimizer.minimize(
+            self.bob_loss, var_list=(tf.get_collection('alice'), tf.get_collection('bob')))
