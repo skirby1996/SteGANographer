@@ -1,7 +1,5 @@
 import tensorflow as tf
 import numpy as np
-import keras
-
 
 def random_boolean_batch(batch_size, n):
     '''
@@ -35,6 +33,14 @@ def get_batch(batch_size, msg_size, key_size):
 
 
 class StegoNet(object):
+    '''
+    The class containing the training model.
+
+    TODO:
+    Implement model saving/loading
+    Convert training model into production model
+    Move from a cipher encryption to a stegonographical embedder
+    '''
     def model(self, collection, msg, key=None):
         if key is not None:
             msg_concat = tf.concat(axis=1, values=[msg, key])
