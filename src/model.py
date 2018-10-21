@@ -2,37 +2,6 @@ import tensorflow as tf
 import numpy as np
 
 
-def random_boolean_batch(batch_size, n):
-    '''
-    Arguments:
-        batch_size: Number of arrays to return
-        n: Length in random boolean batch
-    Returns:
-        batch: A [batch_size, n] array of (-1./1.) boolean numbers
-    '''
-
-    batch = tf.random_uniform(
-        [batch_size, n], minval=0, maxval=2, dtype=tf.int32)
-    batch = (batch * 2) - 1
-    return tf.cast(batch, tf.float32)
-
-
-def get_batch(batch_size, msg_size, key_size):
-    '''
-    Arguments:
-        batch_size: Number of messages and keys to generate
-        msg_size: Bit length of each message
-        key_size: Bit length of each key
-    Returns:
-        msg_batch: A [batch_size, msg_size] array of (-1./1.) boolean values
-        key_batch: A [batch_size, key_size] array of (-1./1.) boolean values
-    '''
-    msg_batch = random_boolean_batch(batch_size, msg_size)
-    key_batch = random_boolean_batch(batch_size, key_size)
-
-    return msg_batch, key_batch
-
-
 class StegoNet(object):
     '''
     The class containing the training model.
@@ -70,13 +39,14 @@ class StegoNet(object):
             conv2 = tf.contrib.layers.conv2d(
                 conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
 
-            return tf.squeeze(conv2, 2)
+            return tf.squeeze(conv2, 2, name=collection + '_out')
 
     def __init__(self, config):
         self.cfg = config
-
-        msg_batch, key_batch = get_batch(
-            self.cfg.BATCH_SIZE, self.cfg.MSG_SIZE, self.cfg.KEY_SIZE)
+        msg_batch = tf.placeholder(tf.float32, shape=(
+            None, self.cfg.MSG_SIZE), name="msg_in")
+        key_batch = tf.placeholder(tf.float32, shape=(
+            None, self.cfg.KEY_SIZE), name="key_in")
         alice_out = self.model('alice', msg_batch, key_batch)
         bob_out = self.model('bob', alice_out, key_batch)
         eve_out = self.model('eve', alice_out, None)

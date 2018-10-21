@@ -1,10 +1,44 @@
 import sys
 import os
 
+import numpy as np
 import tensorflow as tf
 
 from src.config import Config
 from src.model import StegoNet
+
+
+def random_boolean_batch(batch_size, n):
+    '''
+    Arguments:
+        batch_size: Number of arrays to return
+        n: Length in random boolean batch
+    Returns:
+        batch: A [batch_size, n] array of (-1./1.) boolean numbers
+    '''
+
+    batch = np.random.randint(2, size=(batch_size, n))
+    batch = (batch * 2) - 1
+    return batch.astype(float)
+
+
+def get_batch(batch_size, msg_size, key_size):
+    '''
+    Arguments:
+        batch_size: Number of messages and keys to generate
+        msg_size: Bit length of each message
+        key_size: Bit length of each key
+    Returns:
+        msg_batch: A [batch_size, msg_size] array of (-1./1.) boolean values
+        key_batch: A [batch_size, key_size] array of (-1./1.) boolean values
+    '''
+    msg_batch = random_boolean_batch(batch_size, msg_size)
+    key_batch = random_boolean_batch(batch_size, key_size)
+
+    # print(msg_batch)
+    # print(key_batch)
+
+    return msg_batch, key_batch
 
 
 def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
@@ -25,8 +59,9 @@ def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
     bob_loss_total = 0
     eve_loss_total = 0
     for _ in range(n):
+        mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
         bl, el = sess.run(
-            [bob_reconstruction_loss_op, eve_loss_op])
+            [bob_reconstruction_loss_op, eve_loss_op], feed_dict={'msg_in:0': mb, 'key_in:0': kb})
         bob_loss_total += bl
         eve_loss_total += el
     bob_loss = bob_loss_total / (n * cfg.BATCH_SIZE)
@@ -44,14 +79,16 @@ def train(cfg, model_dir):
         os.mkdir(log_dir)
 
     # Create log file or resume previous
+    current_epoch = 0
     log_file_name = os.path.join(log_dir, cfg.MODEL_NAME + "_log.csv")
     if os.path.isfile(log_file_name):
         with open(log_file_name, 'r') as log_file:
-            current_epoch = int(log_file.readlines()[-1].split(',')[0])
-        print("Resuming from epoch %d..." % current_epoch)
-        log_file = open(log_file_name, 'a')
-    else:
-        current_epoch = 0
+            lines = log_file.readlines()
+            if len(lines) > 1:
+                current_epoch = int(lines[-1].split(',')[0])
+                print("Resuming from epoch %d..." % current_epoch)
+                log_file = open(log_file_name, 'a')
+    if current_epoch == 0:
         log_file = open(os.path.join(
             log_dir, cfg.MODEL_NAME + "_log.csv"), 'w')
         log_file.write("epoch,bob_loss,eve_loss\n")
@@ -80,10 +117,15 @@ def train(cfg, model_dir):
 
         print("Training for %d epochs..." % (cfg.NUM_EPOCHS))
         for epoch in range(current_epoch, current_epoch + cfg.NUM_EPOCHS):
+            mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
             for _ in range(cfg.ITERS_PER_ACTOR):
-                sess.run('bob_optimizer')
+                # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+                sess.run('bob_optimizer', feed_dict={
+                         'msg_in:0': mb, 'key_in:0': kb})
             for _ in range(cfg.ITERS_PER_ACTOR * cfg.EVE_MULTIPLIER):
-                sess.run('eve_optimizer')
+                # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+                sess.run('eve_optimizer', feed_dict={
+                         'msg_in:0': mb, 'key_in:0': kb})
             if (epoch + 1) % cfg.LOG_CHECKPOINT == 0:
                 bob_loss, eve_loss = eval(
                     sess, cfg, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
