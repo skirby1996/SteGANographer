@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
+
 def random_boolean_batch(batch_size, n):
     '''
     Arguments:
@@ -41,6 +42,7 @@ class StegoNet(object):
     Convert training model into production model
     Move from a cipher encryption to a stegonographical embedder
     '''
+
     def model(self, collection, msg, key=None):
         if key is not None:
             msg_concat = tf.concat(axis=1, values=[msg, key])
@@ -89,14 +91,15 @@ class StegoNet(object):
         # Eve loss
         eve_bits_wrong = tf.reduce_sum(
             tf.abs((eve_out + 1.) / 2. - (msg_batch + 1.) / 2.), [1])
-        self.eve_loss = tf.reduce_sum(eve_bits_wrong)
+        self.eve_loss = tf.reduce_sum(eve_bits_wrong, name='eve_loss')
         self.eve_optimizer = optimizer.minimize(
-            self.eve_loss, var_list=tf.get_collection('eve'))
+            self.eve_loss, var_list=tf.get_collection('eve'), name='eve_optimizer')
 
         # Alice & bob loss
         self.bob_bits_wrong = tf.reduce_sum(
             tf.abs((bob_out + 1.) / 2. - (msg_batch + 1.) / 2.), [1])
-        self.bob_reconstruction_loss = tf.reduce_sum(self.bob_bits_wrong)
+        self.bob_reconstruction_loss = tf.reduce_sum(
+            self.bob_bits_wrong, name='bob_reconstruction_loss')
         bob_eve_error_deviation = tf.abs(
             float(self.cfg.MSG_SIZE) / 2. - eve_bits_wrong)
         bob_eve_loss = tf.reduce_sum(
@@ -105,4 +108,4 @@ class StegoNet(object):
                          self.cfg.MSG_SIZE + bob_eve_loss)
 
         self.bob_optimizer = optimizer.minimize(
-            self.bob_loss, var_list=(tf.get_collection('alice'), tf.get_collection('bob')))
+            self.bob_loss, var_list=(tf.get_collection('alice'), tf.get_collection('bob')), name='bob_optimizer')
