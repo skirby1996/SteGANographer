@@ -35,11 +35,10 @@ def get_batch(batch_size, msg_size, key_size):
     msg_batch = random_boolean_batch(batch_size, msg_size)
     key_batch = random_boolean_batch(batch_size, key_size)
 
-    # print(msg_batch)
-    # print(key_batch)
-
     return msg_batch, key_batch
 
+def nn_to_bin(batch):
+    return np.around(batch).astype(int)
 
 def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
     '''
@@ -152,6 +151,52 @@ def train(cfg, model_dir):
 #         sess.run(init)
 #         bob_loss_orig, eve_loss_orig = eval(sess, cfg, stego_net, 16)
 
+def production_test(cfg, model_dir):
+    save_dir = os.path.join(model_dir, "data")
+    log_dir = os.path.join(model_dir, "logs")
+    
+    if not os.path.exists(save_dir):
+        print("Error: Model \"%s\" does not exist" % cfg.MODEL_NAME)
+        return False
+    
+    # Use log file to infer current epoch
+    current_epoch = 0
+    log_file_name = os.path.join(log_dir, cfg.MODEL_NAME + "_log.csv")
+    if os.path.isfile(log_file_name):
+        with open(log_file_name, 'r') as log_file:
+            lines = log_file.readlines()
+            if len(lines) > 1:
+                current_epoch = int(lines[-1].split(',')[0])
+                print("Current epoch: %d\n" % current_epoch)
+            else:
+                print("Error: Cannot infer epoch from log file...")
+                return False
+    else:
+        print("Error: No log file from which to infer epoch")
+        return False
+
+    # Restore saved weights
+    weight_file_name = cfg.MODEL_NAME + '_train-' + str(current_epoch)
+    meta_file_name = weight_file_name + '.meta'
+
+    with tf.Session() as sess:
+        saver = tf.train.import_meta_graph(
+            os.path.join(save_dir, meta_file_name))
+        saver.restore(sess, tf.train.latest_checkpoint(save_dir))
+    
+        # Print all tensors and ops in graph for debugging
+        #for n in tf.get_default_graph().as_graph_def().node:
+        #    print(n.name)
+
+        mb, kb = get_batch(1, cfg.MSG_SIZE, cfg.KEY_SIZE)
+
+        print("msg_batch: ", nn_to_bin((mb + 1.) / 2.))
+        print("key_batch: ", nn_to_bin((kb + 1.) / 2.))
+        a_out = sess.run('alice_out:0', feed_dict={'msg_in:0': mb, 'key_in:0': kb})
+        print("alice_out: ", (a_out + 1.) /2.)
+
+        be_out = sess.run('bob_vars_1/bob_eval_out:0', feed_dict={'msg_in:0': a_out, 'key_in:0': kb})        
+        print("bob_eval_out: ", nn_to_bin((be_out + 1.) / 2.))
 
 def main():
     cfg = Config()
@@ -168,7 +213,8 @@ def main():
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    train(cfg, model_dir)
+    #train(cfg, model_dir)
+    production_test(cfg, model_dir)
 
 
 if __name__ == '__main__':
