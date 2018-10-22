@@ -117,13 +117,12 @@ def train(cfg, model_dir):
 
         print("Training for %d epochs..." % (cfg.NUM_EPOCHS))
         for epoch in range(current_epoch, current_epoch + cfg.NUM_EPOCHS):
-            mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
             for _ in range(cfg.ITERS_PER_ACTOR):
-                # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+                mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('bob_optimizer', feed_dict={
                          'msg_in:0': mb, 'key_in:0': kb})
             for _ in range(cfg.ITERS_PER_ACTOR * cfg.EVE_MULTIPLIER):
-                # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+                mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('eve_optimizer', feed_dict={
                          'msg_in:0': mb, 'key_in:0': kb})
             if (epoch + 1) % cfg.LOG_CHECKPOINT == 0:
