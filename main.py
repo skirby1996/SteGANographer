@@ -37,8 +37,10 @@ def get_batch(batch_size, msg_size, key_size):
 
     return msg_batch, key_batch
 
+
 def nn_to_bin(batch):
     return np.around(batch).astype(int)
+
 
 def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
     '''
@@ -104,7 +106,7 @@ def train(cfg, model_dir):
             saver.restore(sess, tf.train.latest_checkpoint(save_dir))
 
         else:
-            stego_net = StegoNet(cfg)
+            _ = StegoNet(cfg)
             sess.run(tf.global_variables_initializer())
             saver = tf.train.Saver()
 
@@ -154,11 +156,11 @@ def train(cfg, model_dir):
 def production_test(cfg, model_dir):
     save_dir = os.path.join(model_dir, "data")
     log_dir = os.path.join(model_dir, "logs")
-    
+
     if not os.path.exists(save_dir):
         print("Error: Model \"%s\" does not exist" % cfg.MODEL_NAME)
         return False
-    
+
     # Use log file to infer current epoch
     current_epoch = 0
     log_file_name = os.path.join(log_dir, cfg.MODEL_NAME + "_log.csv")
@@ -183,20 +185,47 @@ def production_test(cfg, model_dir):
         saver = tf.train.import_meta_graph(
             os.path.join(save_dir, meta_file_name))
         saver.restore(sess, tf.train.latest_checkpoint(save_dir))
-    
-        # Print all tensors and ops in graph for debugging
-        #for n in tf.get_default_graph().as_graph_def().node:
-        #    print(n.name)
 
-        mb, kb = get_batch(1, cfg.MSG_SIZE, cfg.KEY_SIZE)
+        num_tests = 100
+        bob_passed = 0
+        eve_passed = 0
+        for test in range(num_tests):
+            print("\nTest %d:" % (test + 1))
+            mb, kb = get_batch(1, cfg.MSG_SIZE, cfg.KEY_SIZE)
+            msg_bin = nn_to_bin((mb + 1.) / 2.)
+            key_bin = nn_to_bin((kb + 1.) / 2.)
+            print("msg_batch: ", msg_bin)
+            print("key_batch: ", key_bin)
 
-        print("msg_batch: ", nn_to_bin((mb + 1.) / 2.))
-        print("key_batch: ", nn_to_bin((kb + 1.) / 2.))
-        a_out = sess.run('alice_out:0', feed_dict={'msg_in:0': mb, 'key_in:0': kb})
-        print("alice_out: ", (a_out + 1.) /2.)
+            a_out = sess.run('alice_out:0', feed_dict={
+                'msg_in:0': mb, 'key_in:0': kb})
+            alice_out_norm = (a_out + 1.) / 2.
+            print("alice_out: ", alice_out_norm)
 
-        be_out = sess.run('bob_vars_1/bob_eval_out:0', feed_dict={'msg_in:0': a_out, 'key_in:0': kb})        
-        print("bob_eval_out: ", nn_to_bin((be_out + 1.) / 2.))
+            b_out = sess.run('bob_vars_1/bob_eval_out:0',
+                             feed_dict={'msg_in:0': a_out, 'key_in:0': kb})
+            bob_out_bin = nn_to_bin((b_out + 1.) / 2.)
+            print("bob_out: ", bob_out_bin)
+
+            e_out = sess.run('eve_vars_1/eve_eval_out:0',
+                             feed_dict={'msg_in:0': a_out})
+            eve_out_bin = nn_to_bin((e_out + 1.) / 2.)
+            print("eve_out: ", eve_out_bin)
+
+            bob_missed_bits = sess.run(
+                tf.reduce_sum(tf.abs(msg_bin - bob_out_bin)))
+            if bob_missed_bits == 0:
+                bob_passed += 1
+            eve_missed_bits = sess.run(
+                tf.reduce_sum(tf.abs(msg_bin - eve_out_bin)))
+            if eve_missed_bits == 0:
+                eve_passed += 1
+            print("Bob missed: ", bob_missed_bits)
+            print("Eve missed: ", eve_missed_bits)
+        print("\nFinal Results:")
+        print("Bob recovered: [%d/%d]" % (bob_passed, num_tests))
+        print("Eve recovered: [%d/%d]" % (eve_passed, num_tests))
+
 
 def main():
     cfg = Config()
@@ -213,7 +242,7 @@ def main():
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    #train(cfg, model_dir)
+    train(cfg, model_dir)
     production_test(cfg, model_dir)
 
 

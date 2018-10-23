@@ -20,26 +20,26 @@ class StegoNet(object):
 
         with tf.contrib.framework.arg_scope(
             [tf.contrib.layers.fully_connected, tf.contrib.layers.conv2d],
-                variables_collections=[collection]): 
+                variables_collections=[collection]):
 
-                fc0 = tf.contrib.layers.fully_connected(
-                    msg_concat,
-                    self.cfg.MSG_SIZE + self.cfg.KEY_SIZE,
-                    biases_initializer=tf.constant_initializer(0.),
-                    activation_fn=None)
+            fc0 = tf.contrib.layers.fully_connected(
+                msg_concat,
+                self.cfg.MSG_SIZE + self.cfg.KEY_SIZE,
+                biases_initializer=tf.constant_initializer(0.),
+                activation_fn=None)
 
-                fc0 = tf.expand_dims(fc0, 2)
+            fc0 = tf.expand_dims(fc0, 2)
 
-                conv0 = tf.contrib.layers.conv2d(
-                    fc0, 2, 2, 2, 'SAME', activation_fn=tf.nn.sigmoid)
+            conv0 = tf.contrib.layers.conv2d(
+                fc0, 2, 2, 2, 'SAME', activation_fn=tf.nn.sigmoid)
 
-                conv1 = tf.contrib.layers.conv2d(
-                    conv0, 2, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+            conv1 = tf.contrib.layers.conv2d(
+                conv0, 2, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
-                conv2 = tf.contrib.layers.conv2d(
-                    conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
+            conv2 = tf.contrib.layers.conv2d(
+                conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
 
-                return tf.squeeze(conv2, 2, name=collection + '_out')
+            return tf.squeeze(conv2, 2, name=collection + '_out')
 
     def __init__(self, config):
         self.cfg = config
@@ -48,12 +48,15 @@ class StegoNet(object):
         key_batch = tf.placeholder(tf.float32, shape=(
             None, self.cfg.KEY_SIZE), name="key_in")
 
-        alice_out = self.model('alice', msg_batch, key_batch)        
+        alice_out = self.model('alice', msg_batch, key_batch)
         with tf.variable_scope('bob_vars'):
-            bob_out = self.model('bob', alice_out, key_batch) 
+            bob_out = self.model('bob', alice_out, key_batch)
         with tf.variable_scope('bob_vars', reuse=True):
-            bob_eval_out = self.model('bob_eval', msg_batch, key_batch)
-        eve_out = self.model('eve', alice_out, None)
+            _ = self.model('bob_eval', msg_batch, key_batch)
+        with tf.variable_scope('eve_vars'):
+            eve_out = self.model('eve', alice_out, None)
+        with tf.variable_scope('eve_vars', reuse=True):
+            _ = self.model('eve_eval', msg_batch, None)
 
         self.reset_eve_vars = tf.group(
             *[w.initializer for w in tf.get_collection('eve')]
