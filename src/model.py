@@ -15,11 +15,11 @@ class StegoNet(object):
                 biases_initializer=tf.constant_initializer(0.),
                 activation_fn=None)
 
-            msg_fc1 = tf.contrib.layers.fully_connected(
-                msg_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.tanh)
+            # msg_fc1 = tf.contrib.layers.fully_connected(
+            #     msg_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.tanh)
 
             msg_fc2 = tf.contrib.layers.fully_connected(
-                msg_fc1, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.sigmoid)
+                msg_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.sigmoid)
 
             msg_channel = tf.manip.reshape(
                 msg_fc2, [tf.shape(img)[0], self.cfg.IMG_SIZE, self.cfg.IMG_SIZE, 1])
@@ -30,11 +30,11 @@ class StegoNet(object):
                 biases_initializer=tf.constant_initializer(0.),
                 activation_fn=None)
 
-            key_fc1 = tf.contrib.layers.fully_connected(
-                key_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.tanh)
+            # key_fc1 = tf.contrib.layers.fully_connected(
+            #     key_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.tanh)
 
             key_fc2 = tf.contrib.layers.fully_connected(
-                key_fc1, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.sigmoid)
+                key_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.sigmoid)
 
             key_channel = tf.manip.reshape(
                 key_fc2, [tf.shape(img)[0], self.cfg.IMG_SIZE, self.cfg.IMG_SIZE, 1])
@@ -47,17 +47,17 @@ class StegoNet(object):
 
             # Embed embed channel into image
             img_stack = tf.concat(axis=3, values=[img, embed_channel])
-            conv0 = tf.contrib.layers.conv2d(
-                img_stack, 8, 2, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+            # conv0 = tf.contrib.layers.conv2d(
+            #     img_stack, 8, 2, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
-            conv1 = tf.contrib.layers.conv2d(
-                conv0, 8, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+            # conv1 = tf.contrib.layers.conv2d(
+            #     conv0, 8, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
-            conv2 = tf.contrib.layers.conv2d(
-                conv1, 8, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+            # conv2 = tf.contrib.layers.conv2d(
+            #     conv1, 8, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
             conv3 = tf.contrib.layers.conv2d(
-                conv2, 3, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+                img_stack, 3, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
             return tf.to_float(conv3, name=collection + '_out')
 
@@ -68,20 +68,20 @@ class StegoNet(object):
                 variables_collections=[collection]):
 
             # Attempt to extract channel from image
-            conv0 = tf.contrib.layers.conv2d(
-                img, 8, 2, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+            # conv0 = tf.contrib.layers.conv2d(
+            #     img, 8, 2, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
-            conv1 = tf.contrib.layers.conv2d(
-                conv0, 8, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+            # conv1 = tf.contrib.layers.conv2d(
+            #     conv0, 8, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
-            conv2 = tf.contrib.layers.conv2d(
-                conv1, 8, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+            # conv2 = tf.contrib.layers.conv2d(
+            #     conv1, 8, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
-            conv3 = tf.contrib.layers.conv2d(
-                conv2, 3, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+            # conv3 = tf.contrib.layers.conv2d(
+            #     conv2, 3, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
             conv4 = tf.contrib.layers.conv2d(
-                conv3, 1, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+                img, 1, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
             # Generate key channel
             key_fc0 = tf.contrib.layers.fully_connected(
@@ -89,11 +89,11 @@ class StegoNet(object):
                 biases_initializer=tf.constant_initializer(0.),
                 activation_fn=None)
 
-            key_fc1 = tf.contrib.layers.fully_connected(
-                key_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.tanh)
+            # key_fc1 = tf.contrib.layers.fully_connected(
+            #     key_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.tanh)
 
             key_fc2 = tf.contrib.layers.fully_connected(
-                key_fc1, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.sigmoid)
+                key_fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.sigmoid)
 
             key_channel = tf.manip.reshape(
                 key_fc2, shape=[tf.shape(img)[0], self.cfg.IMG_SIZE, self.cfg.IMG_SIZE, 1])
@@ -102,19 +102,22 @@ class StegoNet(object):
             stack = tf.concat(axis=3, values=[conv4, key_channel])
             msg_channel = tf.contrib.layers.conv2d(
                 stack, 1, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
-
+            msg_flattened = tf.contrib.layers.flatten(msg_channel)
             # Attempt to recover msg
-            fc0 = tf.contrib.layers.fully_connected(
-                msg_channel, self.cfg.IMG_SIZE ** 2,
-                activation_fn=tf.nn.sigmoid)
+            # fc0 = tf.contrib.layers.fully_connected(
+            #     msg_channel, self.cfg.IMG_SIZE ** 2,
+            #     activation_fn=tf.nn.sigmoid)
 
             fc1 = tf.contrib.layers.fully_connected(
-                fc0, self.cfg.IMG_SIZE ** 2, activation_fn=tf.nn.tanh)
+                msg_flattened, self.cfg.MSG_SIZE ** 2, activation_fn=tf.nn.sigmoid)
 
             fc2 = tf.contrib.layers.fully_connected(
                 fc1, self.cfg.MSG_SIZE, activation_fn=tf.nn.tanh)
 
-            return tf.to_float(fc2)
+            fc3 = tf.contrib.layers.fully_connected(
+                fc2, self.cfg.MSG_SIZE, activation_fn=None)
+
+            return tf.to_float(fc3, name=collection + "_out")
 
     def eve_model(self, collection, img):
 
@@ -132,11 +135,11 @@ class StegoNet(object):
                 conv1, 1, 2, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
             flattened = tf.contrib.layers.flatten(conv2)
-            fc0 = tf.contrib.layers.fully_connected(
-                flattened, 128, activation_fn=tf.sigmoid)
+            # fc0 = tf.contrib.layers.fully_connected(
+            #     flattened, 128, activation_fn=tf.sigmoid)
 
             fc1 = tf.contrib.layers.fully_connected(
-                fc0, 32, activation_fn=tf.sigmoid)
+                flattened, 32, activation_fn=tf.sigmoid)
 
             eve_out = tf.contrib.layers.fully_connected(
                 fc1, 1, activation_fn=tf.sigmoid)
@@ -187,7 +190,11 @@ class StegoNet(object):
             tf.abs((bob_out + 1.) / 2. - (msg_batch + 1.) / 2.), [1])
         self.bob_reconstruction_loss = tf.reduce_sum(
             self.bob_bits_wrong, name='bob_reconstruction_loss')
-        self.bob_loss = (self.bob_reconstruction_loss * self.eve_loss)
-
+        bob_eve_error_deviation = tf.abs(
+            float(self.cfg.BATCH_SIZE) / 2. - self.eve_loss)
+        bob_eve_loss = tf.reduce_sum(
+            tf.square(bob_eve_error_deviation) / (self.cfg.BATCH_SIZE / 2)**2)
+        self.bob_loss = (self.bob_reconstruction_loss /
+                         self.cfg.MSG_SIZE + bob_eve_loss)
         self.bob_optimizer = optimizer.minimize(
             self.bob_loss, var_list=(tf.get_collection('alice'), tf.get_collection('bob')), name='bob_optimizer')

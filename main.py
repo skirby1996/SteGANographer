@@ -76,9 +76,10 @@ def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
     bob_loss_total = 0
     eve_loss_total = 0
     for _ in range(n):
+        ib = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
         mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
         bl, el = sess.run(
-            [bob_reconstruction_loss_op, eve_loss_op], feed_dict={'msg_in:0': mb, 'key_in:0': kb})
+            [bob_reconstruction_loss_op, eve_loss_op], feed_dict={'img_in:0': ib, 'msg_in:0': mb, 'key_in:0': kb})
         bob_loss_total += bl
         eve_loss_total += el
     bob_loss = bob_loss_total / (n * cfg.BATCH_SIZE)
@@ -135,13 +136,17 @@ def train(cfg, model_dir):
         print("Training for %d epochs..." % (cfg.NUM_EPOCHS))
         for epoch in range(current_epoch, current_epoch + cfg.NUM_EPOCHS):
             for _ in range(cfg.ITERS_PER_ACTOR):
+                ib = random_image_batch(
+                    cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
                 mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('bob_optimizer', feed_dict={
-                         'msg_in:0': mb, 'key_in:0': kb})
+                         'img_in:0': ib, 'msg_in:0': mb, 'key_in:0': kb})
             for _ in range(cfg.ITERS_PER_ACTOR * cfg.EVE_MULTIPLIER):
+                ib = random_image_batch(
+                    cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
                 mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('eve_optimizer', feed_dict={
-                         'msg_in:0': mb, 'key_in:0': kb})
+                         'img_in:0': ib, 'msg_in:0': mb, 'key_in:0': kb})
             if (epoch + 1) % cfg.LOG_CHECKPOINT == 0:
                 bob_loss, eve_loss = eval(
                     sess, cfg, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
@@ -202,7 +207,7 @@ def production_test(cfg, model_dir):
             os.path.join(save_dir, meta_file_name))
         saver.restore(sess, tf.train.latest_checkpoint(save_dir))
 
-        num_tests = 100
+        num_tests = 1
         bob_passed = 0
         eve_passed = 0
         for test in range(num_tests):
@@ -259,7 +264,7 @@ def main():
         os.mkdir(model_dir)
 
     train(cfg, model_dir)
-    production_test(cfg, model_dir)
+    # production_test(cfg, model_dir)
 
 
 if __name__ == '__main__':

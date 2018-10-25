@@ -1,18 +1,18 @@
 class Config(object):
     def __init__(self):
         # Input and output configuration.
-        self.IMG_SIZE = 128
+        self.IMG_SIZE = 64
         self.NUM_CHANNELS = 3
 
-        self.MSG_SIZE = 128
-        self.KEY_SIZE = 128
+        self.MSG_SIZE = 64
+        self.KEY_SIZE = 64
 
         # Training parameters.
         self.NUM_EPOCHS = 10000
-        self.BATCH_SIZE = 128
-        self.LEARNING_RATE = 0.0004
+        self.BATCH_SIZE = 64
+        self.LEARNING_RATE = 0.0008
         self.ITERS_PER_ACTOR = 1
-        self.EVE_MULTIPLIER = 2  # Train Eve 2x for every step of Alice/Bob
+        self.EVE_MULTIPLIER = 1  # Train Eve 2x for every step of Alice/Bob
 
         # Logging parameters
         self.LOG_CHECKPOINT = 25  # Log error rate every n epochs
