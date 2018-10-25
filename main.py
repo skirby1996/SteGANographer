@@ -77,9 +77,10 @@ def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
     eve_loss_total = 0
     for _ in range(n):
         ib = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
-        mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+        mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
+        #mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
         bl, el = sess.run(
-            [bob_reconstruction_loss_op, eve_loss_op], feed_dict={'img_in:0': ib, 'msg_in:0': mb, 'key_in:0': kb})
+            [bob_reconstruction_loss_op, eve_loss_op], feed_dict={'img_in:0': ib, 'msg_in:0': mb})
         bob_loss_total += bl
         eve_loss_total += el
     bob_loss = bob_loss_total / (n * cfg.BATCH_SIZE)
@@ -138,15 +139,17 @@ def train(cfg, model_dir):
             for _ in range(cfg.ITERS_PER_ACTOR):
                 ib = random_image_batch(
                     cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
-                mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+                mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
+                #mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('bob_optimizer', feed_dict={
-                         'img_in:0': ib, 'msg_in:0': mb, 'key_in:0': kb})
+                         'img_in:0': ib, 'msg_in:0': mb})
             for _ in range(cfg.ITERS_PER_ACTOR * cfg.EVE_MULTIPLIER):
                 ib = random_image_batch(
                     cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
-                mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+                mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
+                # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('eve_optimizer', feed_dict={
-                         'img_in:0': ib, 'msg_in:0': mb, 'key_in:0': kb})
+                         'img_in:0': ib, 'msg_in:0': mb})
             if (epoch + 1) % cfg.LOG_CHECKPOINT == 0:
                 bob_loss, eve_loss = eval(
                     sess, cfg, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
