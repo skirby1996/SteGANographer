@@ -1,8 +1,11 @@
 class Config(object):
     def __init__(self):
         # Input and output configuration.
-        self.MSG_SIZE = 32
-        self.KEY_SIZE = 32
+        self.IMG_SIZE = 128
+        self.NUM_CHANNELS = 3
+
+        self.MSG_SIZE = 128
+        self.KEY_SIZE = 128
 
         # Training parameters.
         self.NUM_EPOCHS = 10000
@@ -15,13 +18,15 @@ class Config(object):
         self.LOG_CHECKPOINT = 25  # Log error rate every n epochs
 
         # File parameters
-        self.MODEL_NAME = "Dev_32"
+        self.MODEL_NAME = "Dev"
 
     def print_summary(self):
-        print("Training for %d epochs with batch size of %d\n" %
-              (self.NUM_EPOCHS, self.BATCH_SIZE))
+        print("Model %s training for %d epochs with batch size of %d\n" %
+              (self.MODEL_NAME, self.NUM_EPOCHS, self.BATCH_SIZE))
         print("Eve trains %d times for each step of Alice and Bob\n" %
               (self.EVE_MULTIPLIER))
+        print("img_shape = (%d, %d, %d)\n" %
+              (self.IMG_SIZE, self.IMG_SIZE, self.NUM_CHANNELS))
         print("msg_size = %d\nkey_size = %d\n" %
               (self.MSG_SIZE, self.KEY_SIZE))
         print("learning_rate = %f" % (self.LEARNING_RATE))

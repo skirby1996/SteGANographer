@@ -8,6 +8,22 @@ from src.config import Config
 from src.model import StegoNet
 
 
+def random_image_batch(batch_size, img_size, num_channels):
+    '''
+    Arguments:
+        batch_size: Number of images to generate
+        img_size: Pixel height/width of image
+        num_channels: Channel depth of image
+    Returns:
+        batch: A [batch_size, img_size, img_size, num_channels] 
+               array of (0., 1.) floating values
+    '''
+
+    batch = np.random.randint(0, 256, size=(
+        batch_size, img_size, img_size, num_channels)).astype(float)
+    return batch / 255.
+
+
 def random_boolean_batch(batch_size, n):
     '''
     Arguments:
