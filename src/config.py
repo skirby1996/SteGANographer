@@ -1,11 +1,11 @@
 class Config(object):
     def __init__(self):
         # Input and output configuration.
-        self.IMG_SIZE = 32
+        self.IMG_SIZE = 128
         self.NUM_CHANNELS = 3
 
-        self.MSG_SIZE = 32
-        self.KEY_SIZE = 32
+        self.MSG_SIZE = 128
+        self.KEY_SIZE = 128
 
         # Training parameters.
         self.NUM_EPOCHS = 10000
@@ -18,7 +18,7 @@ class Config(object):
         self.LOG_CHECKPOINT = 25  # Log error rate every n epochs
 
         # File parameters
-        self.MODEL_NAME = "Dev"
+        self.MODEL_NAME = "Dev_128"
 
     def print_summary(self):
         print("Model %s training for %d epochs with batch size of %d\n" %
