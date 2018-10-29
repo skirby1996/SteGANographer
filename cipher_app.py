@@ -176,8 +176,8 @@ def main():
                     eve_out += chr(e_char_val)
 
             # print("msg: ", msg)
-            print("bob_out: ", bob_out)
-            print("eve_out: ", eve_out)
+            print("bob_out: ", bob_out.encode('utf-8').strip())
+            print("eve_out: ", eve_out.encode('utf-8').strip())
 
             user_in = None
             while user_in != 'y' and user_in != 'n':

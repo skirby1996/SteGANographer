@@ -7,7 +7,7 @@ class Config(object):
         # Training parameters.
         self.NUM_EPOCHS = 10000
         self.BATCH_SIZE = 128
-        self.LEARNING_RATE = 0.0004
+        self.LEARNING_RATE = 0.0008
         self.ITERS_PER_ACTOR = 1
         self.EVE_MULTIPLIER = 2  # Train Eve 2x for every step of Alice/Bob
 
