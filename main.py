@@ -242,7 +242,7 @@ def main():
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    train(cfg, model_dir)
+    #train(cfg, model_dir)
     production_test(cfg, model_dir)
 
 

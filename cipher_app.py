@@ -44,16 +44,15 @@ def nn_to_bin(batch):
 
 def main():
     cfg = Config()
-    cfg.print_summary()
-
-    # Parse command line args
 
     # Make dirs for model saving and logging
     root_dir = os.path.abspath("")
     model_dir = os.path.join(root_dir, "models")
+    model_dir = os.path.join(model_dir, cfg.MODEL_NAME)
     save_dir = os.path.join(model_dir, "data")
     log_dir = os.path.join(model_dir, "logs")
 
+    print(save_dir)
     if not os.path.exists(save_dir):
         print("Error: Model \"%s\" does not exist" % cfg.MODEL_NAME)
         return False
@@ -83,23 +82,78 @@ def main():
             os.path.join(save_dir, meta_file_name))
         saver.restore(sess, tf.train.latest_checkpoint(save_dir))
 
+        print("\nKey length: %d\nMsg length: %d" %
+              (cfg.KEY_SIZE, cfg.MSG_SIZE))
         replay = True
         while replay:
+            print("\nGet Alice inputs...")
             msg = input("Enter a message: ")
             key = input("Enter a key: ")
 
-            # Convert msg and key to binary
-            # Pad msg and key as needed
-            # Build message and key batch
-            mb = None
-            kb = None
+            batch_chars = int(cfg.MSG_SIZE / 8)
+            msg += (' ' * (batch_chars - len(msg) % batch_chars))
+            key += (' ' * (batch_chars - len(key) % batch_chars))
+            key = key[:batch_chars]
+
+            batches = int(len(msg) / batch_chars)
+            msg_batch = np.zeros((batches, cfg.MSG_SIZE))
+            key_batch = np.zeros((batches, cfg.KEY_SIZE))
+            for b_ix in range(batches):
+                mb = msg[b_ix * batch_chars:(b_ix + 1) * batch_chars]
+                for c_ix in range(len(mb)):
+                    c = mb[c_ix]
+                    char_val = ord(c)
+                    pow = 7
+                    while char_val > 0:
+                        if char_val >= 2 ** pow:
+                            char_val -= 2 ** pow
+                            msg_batch[b_ix][c_ix * 8 + (7 - pow)] = 1.
+                        pow -= 1
+
+                kb = key
+                for c_ix in range(len(kb)):
+                    c = kb[c_ix]
+                    char_val = ord(c)
+                    pow = 7
+                    while char_val > 0:
+                        if char_val >= 2 ** pow:
+                            char_val -= 2 ** pow
+                            key_batch[b_ix][c_ix * 8 + (7 - pow)] = 1.
+                        pow -= 1
+                # print("[%s]" % kb)
+                # print(key_batch[b_ix])
+
+            msg_batch = (msg_batch * 2) - 1
+            key_batch = (key_batch * 2) - 1
 
             a_out = sess.run('alice_out:0', feed_dict={
-                'msg_in:0': mb, 'key_in:0': kb})
+                'msg_in:0': msg_batch, 'key_in:0': key_batch})
+
+            print("\nGet Bob's inputs...")
+            #print("msg: ", a_out)
+            key = input("Enter a key: ")
+            key += (' ' * (batch_chars - len(key) % batch_chars))
+            key = key[:batch_chars]
+            key_batch = np.zeros((batches, cfg.KEY_SIZE))
+            for b_ix in range(batches):
+                kb = key
+                for c_ix in range(len(kb)):
+                    c = kb[c_ix]
+                    char_val = ord(c)
+                    pow = 7
+                    while char_val > 0:
+                        if char_val >= 2 ** pow:
+                            char_val -= 2 ** pow
+                            key_batch[b_ix][c_ix * 8 + (7 - pow)] = 1.
+                        pow -= 1
+            key_batch = (key_batch * 2) - 1
 
             b_out = sess.run('bob_vars_1/bob_eval_out:0',
-                             feed_dict={'msg_in:0': a_out, 'key_in:0': kb})
+                             feed_dict={'msg_in:0': a_out, 'key_in:0': key_batch})
             bob_out_bin = nn_to_bin((b_out + 1.) / 2.)
+
+            # print("Get Eve's inputs...")
+            # print("msg: ", a_out)
 
             e_out = sess.run('eve_vars_1/eve_eval_out:0',
                              feed_dict={'msg_in:0': a_out})
@@ -108,12 +162,28 @@ def main():
             # Convert binary to back to string
             bob_out = ""
             eve_out = ""
+            for b_ix in range(batches):
+                bb = bob_out_bin[b_ix]
+                eb = eve_out_bin[b_ix]
+                for c_ix in range(batch_chars):
+                    b_char_val = 0
+                    e_char_val = 0
+                    for ix in range(8):
+                        pow = 7 - ix
+                        b_char_val += bb[8 * c_ix + ix] * 2**pow
+                        e_char_val += eb[8 * c_ix + ix] * 2**pow
+                    bob_out += chr(b_char_val)
+                    eve_out += chr(e_char_val)
 
+            # print("msg: ", msg)
             print("bob_out: ", bob_out)
             print("eve_out: ", eve_out)
 
-            user_in = input("Encrypt another message? (y/n)")
-            if userin
+            user_in = None
+            while user_in != 'y' and user_in != 'n':
+                user_in = input("Encrypt another message? (y/n) ").lower()
+            if user_in == 'n':
+                replay = False
 
 
 if __name__ == '__main__':
