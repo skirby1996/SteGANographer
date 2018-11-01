@@ -20,7 +20,7 @@ class StegoNet(object):
             conv2 = tf.contrib.layers.conv2d(
                 conv1, 3, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
-            return tf.to_float(conv2, name=collection + '_out')
+            return tf.identity(conv2, name=collection + '_out')
 
     def bob_model(self, collection, img):
 
@@ -35,9 +35,9 @@ class StegoNet(object):
                 conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
 
             conv2 = tf.contrib.layers.conv2d(
-                conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+                conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
 
-            return tf.to_float(conv2, name=collection + '_out')
+            return tf.identity(conv2, name=collection + '_out')
 
     def eve_model(self, collection, img):
 
@@ -59,7 +59,7 @@ class StegoNet(object):
             eve_out = tf.contrib.layers.fully_connected(
                 flattened, 1, activation_fn=tf.sigmoid)
 
-            return tf.to_float(eve_out, name=collection + '_out')
+            return tf.identity(eve_out, name=collection + '_out')
 
     def __init__(self, config):
         self.cfg = config
@@ -99,8 +99,10 @@ class StegoNet(object):
             self.eve_loss, var_list=tf.get_collection('eve'), name='eve_optimizer')
 
         # Alice & bob loss
+        self.bob_bits_wrong = tf.reduce_sum(
+            tf.abs((bob_out + 1.) / 2. - (msg_batch + 1.) / 2.), [1])
         self.bob_reconstruction_loss = tf.reduce_sum(
-            tf.abs(bob_out - msg_batch), name='bob_reconstruction_loss')
+            self.bob_bits_wrong, name='bob_reconstruction_loss')
         bob_eve_error_deviation = tf.abs(
             float(self.cfg.BATCH_SIZE) / 2. - self.eve_loss)
         bob_eve_loss = tf.reduce_sum(

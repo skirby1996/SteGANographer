@@ -4,7 +4,9 @@ import os
 import numpy as np
 import tensorflow as tf
 
+from PIL import Image
 from src.config import Config
+from src.dataset import Dataset
 from src.model import StegoNet
 
 
@@ -15,13 +17,19 @@ def random_image_batch(batch_size, img_size, num_channels):
         img_size: Pixel height/width of image
         num_channels: Channel depth of image
     Returns:
-        batch: A [batch_size, img_size, img_size, num_channels] 
+        batch: A [batch_size, img_size, img_size, num_channels]
                array of (0., 1.) floating values
     '''
 
-    batch = np.random.randint(0, 256, size=(
+    # Generates random pixel vals
+    # batch = np.random.randint(0, 256, size=(
+    #     batch_size, img_size, img_size, num_channels)).astype(float)
+    # return batch / 255.
+
+    batch = np.random.randint(2, size=(
         batch_size, img_size, img_size, num_channels)).astype(float)
-    return batch / 255.
+
+    return ((batch * 2) - 1)
 
 
 def random_boolean_batch(batch_size, n):
@@ -58,13 +66,14 @@ def nn_to_bin(batch):
     return np.around(batch).astype(int)
 
 
-def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
+def eval(sess, cfg, dst, eve_loss_op, bob_reconstruction_loss_op, n):
     '''
     Evaluates the current network on n batches of random examples
 
     Arguments:
         sess: The current tensorflow session
         cfg: An instance of the Config class
+        dst: An instance of the Dataset class
         eve_loss_op: Eve's loss tensor
         bob_reconstruction_loss_op: Bob's reconstruction loss tensor
         n: The number of iterations to run
@@ -76,9 +85,9 @@ def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
     bob_loss_total = 0
     eve_loss_total = 0
     for _ in range(n):
-        ib = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
+        ib = dst.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
         mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
-        #mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+        # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
         bl, el = sess.run(
             [bob_reconstruction_loss_op, eve_loss_op], feed_dict={'img_in:0': ib, 'msg_in:0': mb})
         bob_loss_total += bl
@@ -88,7 +97,7 @@ def eval(sess, cfg, eve_loss_op, bob_reconstruction_loss_op, n):
     return bob_loss, eve_loss
 
 
-def train(cfg, model_dir):
+def train(cfg, model_dir, train_set, val_set):
     # Create folders for model weights and logging
     save_dir = os.path.join(model_dir, "data")
     log_dir = os.path.join(model_dir, "logs")
@@ -130,29 +139,27 @@ def train(cfg, model_dir):
 
         # Get initial loss from starting weights
         bob_loss, eve_loss = eval(
-            sess, cfg, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
+            sess, cfg, val_set, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
         if (current_epoch == 0):
             log_file.write("0,%f,%f\n" % (bob_loss, eve_loss))
 
         print("Training for %d epochs..." % (cfg.NUM_EPOCHS))
         for epoch in range(current_epoch, current_epoch + cfg.NUM_EPOCHS):
             for _ in range(cfg.ITERS_PER_ACTOR):
-                ib = random_image_batch(
-                    cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
+                ib = train_set.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
                 mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
-                #mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+                # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('bob_optimizer', feed_dict={
                          'img_in:0': ib, 'msg_in:0': mb})
             for _ in range(cfg.ITERS_PER_ACTOR * cfg.EVE_MULTIPLIER):
-                ib = random_image_batch(
-                    cfg.BATCH_SIZE, cfg.IMG_SIZE, cfg.NUM_CHANNELS)
+                ib = train_set.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
                 mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
                 # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('eve_optimizer', feed_dict={
                          'img_in:0': ib, 'msg_in:0': mb})
             if (epoch + 1) % cfg.LOG_CHECKPOINT == 0:
                 bob_loss, eve_loss = eval(
-                    sess, cfg, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
+                    sess, cfg, val_set, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
                 log_file.write("%d,%f,%f\n" % (epoch + 1, bob_loss, eve_loss))
 
             # Display progress in console
@@ -177,13 +184,17 @@ def train(cfg, model_dir):
 #         sess.run(init)
 #         bob_loss_orig, eve_loss_orig = eval(sess, cfg, stego_net, 16)
 
-def production_test(cfg, model_dir):
+def production_test(cfg, model_dir, dst):
     save_dir = os.path.join(model_dir, "data")
     log_dir = os.path.join(model_dir, "logs")
+    results_dir = os.path.join(model_dir, "results")
 
     if not os.path.exists(save_dir):
         print("Error: Model \"%s\" does not exist" % cfg.MODEL_NAME)
         return False
+
+    if not os.path.exists(results_dir):
+        os.mkdir(results_dir)
 
     # Use log file to infer current epoch
     current_epoch = 0
@@ -210,50 +221,48 @@ def production_test(cfg, model_dir):
             os.path.join(save_dir, meta_file_name))
         saver.restore(sess, tf.train.latest_checkpoint(save_dir))
 
-        num_tests = 1
+        num_tests = 50
         bob_passed = 0
-        eve_passed = 0
         for test in range(num_tests):
             print("\nTest %d:" % (test + 1))
-            mb, kb = get_batch(1, cfg.MSG_SIZE, cfg.KEY_SIZE)
+            ib = dst.get_batch(1, cfg.IMG_SIZE)
+            mb = random_image_batch(1, cfg.IMG_SIZE, 1)
             msg_bin = nn_to_bin((mb + 1.) / 2.)
-            key_bin = nn_to_bin((kb + 1.) / 2.)
-            print("msg_batch: ", msg_bin)
-            print("key_batch: ", key_bin)
+
+            image_norm = (ib * 255.).astype('uint8')[0]
+            image = Image.fromarray(image_norm, 'RGB')
+            image.save(os.path.join(
+                results_dir, (str(test) + "_original.bmp")))
 
             a_out = sess.run('alice_out:0', feed_dict={
-                'msg_in:0': mb, 'key_in:0': kb})
-            alice_out_norm = (a_out + 1.) / 2.
-            print("alice_out: ", alice_out_norm)
+                'img_in:0': ib, 'msg_in:0': mb})
+
+            alice_out_norm = (a_out * 255.).astype('uint8')[0]
+            alice_out_img = Image.fromarray(alice_out_norm, 'RGB')
+            alice_out_img.save(os.path.join(
+                results_dir, (str(test) + "_embedded.bmp")))
 
             b_out = sess.run('bob_vars_1/bob_eval_out:0',
-                             feed_dict={'msg_in:0': a_out, 'key_in:0': kb})
+                             feed_dict={'img_in:0': a_out})
             bob_out_bin = nn_to_bin((b_out + 1.) / 2.)
-            print("bob_out: ", bob_out_bin)
-
-            e_out = sess.run('eve_vars_1/eve_eval_out:0',
-                             feed_dict={'msg_in:0': a_out})
-            eve_out_bin = nn_to_bin((e_out + 1.) / 2.)
-            print("eve_out: ", eve_out_bin)
+            #print("bob_out: ", bob_out_bin)
 
             bob_missed_bits = sess.run(
                 tf.reduce_sum(tf.abs(msg_bin - bob_out_bin)))
             if bob_missed_bits == 0:
                 bob_passed += 1
-            eve_missed_bits = sess.run(
-                tf.reduce_sum(tf.abs(msg_bin - eve_out_bin)))
-            if eve_missed_bits == 0:
-                eve_passed += 1
             print("Bob missed: ", bob_missed_bits)
-            print("Eve missed: ", eve_missed_bits)
+
         print("\nFinal Results:")
         print("Bob recovered: [%d/%d]" % (bob_passed, num_tests))
-        print("Eve recovered: [%d/%d]" % (eve_passed, num_tests))
 
 
 def main():
     cfg = Config()
     cfg.print_summary()
+
+    train_set = Dataset(cfg, "train")
+    val_set = Dataset(cfg, "val")
 
     # Parse command line args
 
@@ -266,8 +275,8 @@ def main():
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    train(cfg, model_dir)
-    # production_test(cfg, model_dir)
+    train(cfg, model_dir, train_set, val_set)
+    production_test(cfg, model_dir, val_set)
 
 
 if __name__ == '__main__':
