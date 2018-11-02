@@ -11,7 +11,6 @@ from src.config import Config
 def nn_to_bin(batch):
     return np.around(batch).astype(int)
 
-
 def load_model(cfg, model_dir):
     save_dir = os.path.join(model_dir, "data")
     log_dir = os.path.join(model_dir, "logs")
@@ -78,21 +77,92 @@ def load_model(cfg, model_dir):
         print("\nFinal Results:")
         print("Bob recovered: [%d/%d]" % (bob_passed, num_tests))
 
+def encrypt(cfg, sess, img_path, file_path, out_dir):
+    # Create image batch
+    with Image.open(img_path) as img:
+        width, height = img.size
+        ib = np.zeros(shape=(width * height, cfg.IMG_SIZE, cfg.IMG_SIZE, 3))
+        for w in range(width // cfg.IMG_SIZE):
+            for h in range(height // cfg.IMG_SIZE):
+                img_b = img.crop(box=(w * IMG_SIZE, y * IMG_SIZE, (w + 1) * IMG_SIZE, (h + 1) * IMG_SIZE))
+                data_b = np.asarray(img_b, dtype='float32')
+                data_b /= 255.
+                ib[w * (width // cfg.IMG_SIZE) + h] = data_b
+
+    # Create message batch
+
+    # Send batches through Alice
+
+    # Build image from Alice output
+
+
+def decrypt(cfg, sess, img_path, out_dir):
+    # Create image batch
+
+    # Send batches through Bob
+
+    # Build file from Bob output
 
 def main():
     cfg = Config()
 
-    # Make dirs for model saving and logging
+    # Prepare directories
     root_dir = os.path.abspath("")
     model_dir = os.path.join(root_dir, "models")
     model_dir = os.path.join(model_dir, cfg.MODEL_NAME)
     if not os.path.exists(model_dir):
         print("Error: No model exists at %s" % model_dir)
         return False
+
+    target_dir = os.path.join(root_dir, "production")
+    if not os.path.exists(target_dir):
+        os.mkdir(target_dir)
+    in_dir = os.path.join(target_dir, "input")
+    out_dir = os.path.join(target_dir, "output")
+    if not os.path.exists(in_dir):
+        os.mkdir(in_dir)
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+
+    # Load model
     sess = load_model(cfg, model_dir)
 
-    sess.close()
+    repeat = True
+    while repeat:
 
+        mode = ""
+        if mode.lower() not 'e' and mode.lower() not 'd':
+            mode = input("Encrypt or Decrypt? (E/D): ")
+        if mode == 'e':
+            # Embed using Alice net
+            user_in = input("Please enter name of vessel image: ")
+            vessel_img_path = os.path.join(in_dir, user_in)
+            user_in = input("Please enter name of target file: ")
+            target_file_path = os.path.join(in_dir, user_in)
+        
+            if os.path.exists(vessel_img_path) and os.path.exists(target_file_path):
+                encrypt(cfg, sess, vessel_img_path, target_file_path, out_dir)
+            else:
+                if not os.path.exists(vessel_img):
+                    print("Error: No image at %s" % vessel_img_path)
+                if not os.path.exists(target_file_path):
+                    print("Error: No file at %s" % target_file_path)
+        else:
+            # Extract using Bob net
+            user_in = input("Please enter name of embedded image: ")
+            embedded_img_path = os.path.join(in_dir, user_in)
+            if os.path.exists(embedded_img_path):
+                decrypt(cfg, sess, embedded_img_path, out_dir)
+            else:
+                print("Error: No file at %s" % embedded_img_path)
+
+        user_in = ""
+        if user_in.lower() not 'y' and user_in.lower() not 'n':
+            user_in = input("Repeat? (Y/N): ")
+        if user_in == 'n':
+            repeat = False
+
+    sess.close()
 
 if __name__ == '__main__':
     main()
