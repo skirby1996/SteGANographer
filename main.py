@@ -66,7 +66,7 @@ def nn_to_bin(batch):
     return np.around(batch).astype(int)
 
 
-def eval(sess, cfg, dst, eve_loss_op, bob_reconstruction_loss_op, n):
+def eval(sess, cfg, dst, img_loss_op, bob_reconstruction_loss_op, n):
     '''
     Evaluates the current network on n batches of random examples
 
@@ -83,18 +83,18 @@ def eval(sess, cfg, dst, eve_loss_op, bob_reconstruction_loss_op, n):
         eve_loss: Eve's error rate
     '''
     bob_loss_total = 0
-    eve_loss_total = 0
+    img_loss_total = 0
     for _ in range(n):
         ib = dst.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
         mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
         # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
-        bl, el = sess.run(
-            [bob_reconstruction_loss_op, eve_loss_op], feed_dict={'img_in:0': ib, 'msg_in:0': mb})
+        bl, il = sess.run(
+            [bob_reconstruction_loss_op, img_loss_op], feed_dict={'img_in:0': ib, 'msg_in:0': mb})
         bob_loss_total += bl
-        eve_loss_total += el
+        img_loss_total += il
     bob_loss = bob_loss_total / (n * cfg.BATCH_SIZE)
-    eve_loss = eve_loss_total / (n * cfg.BATCH_SIZE)
-    return bob_loss, eve_loss
+    img_loss = img_loss_total / (n * cfg.BATCH_SIZE)
+    return bob_loss, img_loss
 
 
 def train(cfg, model_dir, train_set, val_set):
@@ -138,36 +138,36 @@ def train(cfg, model_dir, train_set, val_set):
             saver = tf.train.Saver()
 
         # Get initial loss from starting weights
-        bob_loss, eve_loss = eval(
-            sess, cfg, val_set, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
+        bob_loss, img_loss = eval(
+            sess, cfg, val_set, 'img_loss:0', 'bob_reconstruction_loss:0', 16)
         if (current_epoch == 0):
-            log_file.write("0,%f,%f\n" % (bob_loss, eve_loss))
+            log_file.write("0,%f,%f\n" % (bob_loss, img_loss))
 
         print("Training for %d epochs..." % (cfg.NUM_EPOCHS))
         for epoch in range(current_epoch, current_epoch + cfg.NUM_EPOCHS):
-            for _ in range(cfg.ITERS_PER_ACTOR):
+            for _ in range(cfg.ITERS_PER_ACTOR * cfg.ALICE_MULTIPLIER):
+                ib = train_set.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
+                mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
+                # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
+                sess.run('alice_bob_optimizer', feed_dict={
+                         'img_in:0': ib, 'msg_in:0': mb})
+            for _ in range(cfg.ITERS_PER_ACTOR * cfg.BOB_MULTIPLIER):
                 ib = train_set.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
                 mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
                 # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
                 sess.run('bob_optimizer', feed_dict={
                          'img_in:0': ib, 'msg_in:0': mb})
-            for _ in range(cfg.ITERS_PER_ACTOR * cfg.EVE_MULTIPLIER):
-                ib = train_set.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
-                mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
-                # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
-                sess.run('eve_optimizer', feed_dict={
-                         'img_in:0': ib, 'msg_in:0': mb})
             if (epoch + 1) % cfg.LOG_CHECKPOINT == 0:
-                bob_loss, eve_loss = eval(
-                    sess, cfg, val_set, 'eve_loss:0', 'bob_reconstruction_loss:0', 16)
-                log_file.write("%d,%f,%f\n" % (epoch + 1, bob_loss, eve_loss))
+                bob_loss, img_loss = eval(
+                    sess, cfg, val_set, 'img_loss:0', 'bob_reconstruction_loss:0', 16)
+                log_file.write("%d,%f,%f\n" % (epoch + 1, bob_loss, img_loss))
 
             # Display progress in console
             prog = int(20. * (epoch - current_epoch + 1)/(cfg.NUM_EPOCHS))
             prog_bar = "[%s%s%s]" % (
                 '=' * prog, ('=' if prog == 20 else '>'), '.' * (20 - prog),)
-            print("Epoch %06d/%06d - %s\tbob_loss: %f\teve_loss: %f" % (
-                epoch + 1, current_epoch + cfg.NUM_EPOCHS, prog_bar, bob_loss, eve_loss), end="\r", flush=True)
+            print("Epoch %06d/%06d - %s\tbob_loss: %f\timg_loss: %f" % (
+                epoch + 1, current_epoch + cfg.NUM_EPOCHS, prog_bar, bob_loss, img_loss), end="\r", flush=True)
         print('\n')
         save_name = cfg.MODEL_NAME + "_train"
         saver.save(sess, os.path.join(save_dir, save_name),
