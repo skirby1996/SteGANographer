@@ -221,7 +221,7 @@ def production_test(cfg, model_dir, dst):
             os.path.join(save_dir, meta_file_name))
         saver.restore(sess, tf.train.latest_checkpoint(save_dir))
 
-        num_tests = 50
+        num_tests = 1000
         bob_passed = 0
         for test in range(num_tests):
             print("\nTest %d:" % (test + 1))
@@ -241,6 +241,11 @@ def production_test(cfg, model_dir, dst):
             alice_out_img = Image.fromarray(alice_out_norm, 'RGB')
             alice_out_img.save(os.path.join(
                 results_dir, (str(test) + "_embedded.bmp")))
+
+            a_out *= 255.
+            a_out = a_out.astype(int)
+            a_out = a_out.astype(float)
+            a_out /= 255.
 
             b_out = sess.run('bob_vars_1/bob_eval_out:0',
                              feed_dict={'img_in:0': a_out})
