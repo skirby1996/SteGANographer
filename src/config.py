@@ -8,11 +8,11 @@ class Config(object):
         self.KEY_SIZE = 32
 
         # Training parameters.
-        self.NUM_EPOCHS = 10000
-        self.BATCH_SIZE = 64
+        self.NUM_EPOCHS = 1000
+        self.BATCH_SIZE = 256
         self.LEARNING_RATE = 0.0008
         self.ITERS_PER_ACTOR = 1
-        self.ALICE_MULTIPLIER = 4  # Train alice_bob_optimizer x times each epoch
+        self.ALICE_MULTIPLIER = 0  # Train alice_bob_optimizer x times each epoch
         self.BOB_MULTIPLIER = 1  # Train bob_optimizer x times each epoch
 
         # Dataset parameters

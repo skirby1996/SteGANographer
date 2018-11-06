@@ -221,26 +221,26 @@ def production_test(cfg, model_dir, dst):
             os.path.join(save_dir, meta_file_name))
         saver.restore(sess, tf.train.latest_checkpoint(save_dir))
 
-        num_tests = 1000
+        num_tests = 5000
         bob_passed = 0
         for test in range(num_tests):
-            print("\nTest %d:" % (test + 1))
+            #print("\nTest %d:" % (test + 1))
             ib = dst.get_batch(1, cfg.IMG_SIZE)
             mb = random_image_batch(1, cfg.IMG_SIZE, 1)
             msg_bin = nn_to_bin((mb + 1.) / 2.)
 
             image_norm = (ib * 255.).astype('uint8')[0]
             image = Image.fromarray(image_norm, 'RGB')
-            image.save(os.path.join(
-                results_dir, (str(test) + "_original.bmp")))
+            # image.save(os.path.join(
+            #    results_dir, (str(test) + "_original.bmp")))
 
             a_out = sess.run('alice_out:0', feed_dict={
                 'img_in:0': ib, 'msg_in:0': mb})
 
             alice_out_norm = (a_out * 255.).astype('uint8')[0]
             alice_out_img = Image.fromarray(alice_out_norm, 'RGB')
-            alice_out_img.save(os.path.join(
-                results_dir, (str(test) + "_embedded.bmp")))
+            # alice_out_img.save(os.path.join(
+            #    results_dir, (str(test) + "_embedded.bmp")))
 
             a_out *= 255.
             a_out = a_out.astype(int)
@@ -256,7 +256,19 @@ def production_test(cfg, model_dir, dst):
                 tf.reduce_sum(tf.abs(msg_bin - bob_out_bin)))
             if bob_missed_bits == 0:
                 bob_passed += 1
-            print("Bob missed: ", bob_missed_bits)
+            else:
+                image.save(os.path.join(
+                    results_dir, (str(test) + "_original.bmp")))
+                alice_out_img.save(os.path.join(
+                    results_dir, (str(test) + "_embedded.bmp")))
+
+            #print("Bob missed: ", bob_missed_bits)
+            # Display progress in console
+            prog = int(20. * (test + 1)/(num_tests))
+            prog_bar = "[%s%s%s]" % (
+                '=' * prog, ('=' if prog == 20 else '>'), '.' * (20 - prog),)
+            print("Test %06d/%06d - %s\tFailed: %d" % (
+                test + 1, num_tests, prog_bar, test - bob_passed + 1), end="\r", flush=True)
 
         print("\nFinal Results:")
         print("Bob recovered: [%d/%d]" % (bob_passed, num_tests))
@@ -280,7 +292,7 @@ def main():
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    train(cfg, model_dir, train_set, val_set)
+    #train(cfg, model_dir, train_set, val_set)
     production_test(cfg, model_dir, val_set)
 
 
