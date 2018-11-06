@@ -10,6 +10,7 @@ class Config(object):
         # Training parameters.
         self.NUM_EPOCHS = 1000
         self.BATCH_SIZE = 256
+    
         self.LEARNING_RATE = 0.0008
         self.ITERS_PER_ACTOR = 1
         self.ALICE_MULTIPLIER = 0  # Train alice_bob_optimizer x times each epoch
