@@ -68,7 +68,10 @@ class StegoNet(object):
         msg_batch = tf.placeholder(tf.float32, shape=(
             None, self.cfg.IMG_SIZE, self.cfg.IMG_SIZE, 1), name="msg_in")
 
-        alice_out = self.alice_model('alice', img_batch, msg_batch)
+        with tf.variable_scope('alice_vars'):
+            alice_out = self.alice_model('alice', img_batch, msg_batch)
+        with tf.variable_scope('alice_vars', reuse=True):
+            _ = self.alice_model('alice_eval', img_batch, msg_batch)
         with tf.variable_scope('bob_vars'):
             bob_out = self.bob_model('bob', alice_out)
         with tf.variable_scope('bob_vars', reuse=True):
@@ -100,7 +103,7 @@ class StegoNet(object):
 
         # Alice & bob loss
         bob_img_diff = tf.reduce_sum(
-            tf.square(img_batch - alice_out), [1, 2, 3])
+            tf.abs(img_batch - alice_out), [1, 2, 3])
         self.bob_img_loss = tf.reduce_sum(bob_img_diff, name='img_loss')
         self.bob_bits_wrong = tf.reduce_sum(
             tf.abs((bob_out + 1.) / 2. - (msg_batch + 1.) / 2.), [1])

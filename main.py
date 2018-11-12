@@ -82,19 +82,14 @@ def eval(sess, cfg, dst, img_loss_op, bob_reconstruction_loss_op, n):
         bob_loss: Bob's error rate
         eve_loss: Eve's error rate
     '''
-    bob_loss_total = 0
-    img_loss_total = 0
-    for _ in range(n):
-        ib = dst.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
-        mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
-        # mb, kb = get_batch(cfg.BATCH_SIZE, cfg.MSG_SIZE, cfg.KEY_SIZE)
-        bl, il = sess.run(
-            [bob_reconstruction_loss_op, img_loss_op], feed_dict={'img_in:0': ib, 'msg_in:0': mb})
-        bob_loss_total += bl
-        img_loss_total += il
-    bob_loss = bob_loss_total / (n * cfg.BATCH_SIZE)
-    img_loss = img_loss_total / (n * cfg.BATCH_SIZE)
-    return bob_loss, img_loss
+
+    ib = dst.get_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE)
+    mb = random_image_batch(cfg.BATCH_SIZE, cfg.IMG_SIZE, 1)
+
+    bob_loss, img_loss = sess.run(
+        [bob_reconstruction_loss_op, img_loss_op], feed_dict={'img_in:0': ib, 'msg_in:0': mb})
+
+    return bob_loss / cfg.BATCH_SIZE, img_loss / cfg.BATCH_SIZE
 
 
 def train(cfg, model_dir, train_set, val_set):
@@ -234,7 +229,7 @@ def production_test(cfg, model_dir, dst):
             # image.save(os.path.join(
             #    results_dir, (str(test) + "_original.bmp")))
 
-            a_out = sess.run('alice_out:0', feed_dict={
+            a_out = sess.run('alice_vars_1/alice_eval_out:0', feed_dict={
                 'img_in:0': ib, 'msg_in:0': mb})
 
             alice_out_norm = (a_out * 255.).astype('uint8')[0]
@@ -292,7 +287,7 @@ def main():
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    #train(cfg, model_dir, train_set, val_set)
+    train(cfg, model_dir, train_set, val_set)
     production_test(cfg, model_dir, val_set)
 
 
