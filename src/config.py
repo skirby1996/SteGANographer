@@ -23,7 +23,7 @@ class Config(object):
         self.LOG_CHECKPOINT = 25  # Log error rate every n epochs
 
         # File parameters
-        self.MODEL_NAME = "StegoNet_32_v2"
+        self.MODEL_NAME = "StegoNet_32_v3"
 
     def print_summary(self):
         print("Model %s training for %d epochs with batch size of %d\n" %

@@ -244,7 +244,8 @@ def production_test(cfg, model_dir, dst):
 
             b_out = sess.run('bob_vars_1/bob_eval_out:0',
                              feed_dict={'img_in:0': a_out})
-            bob_out_bin = nn_to_bin((b_out + 1.) / 2.)
+            #bob_out_bin = nn_to_bin((b_out + 1.) / 2.)
+            bob_out_bin = nn_to_bin(b_out)
             #print("bob_out: ", bob_out_bin)
 
             bob_missed_bits = sess.run(

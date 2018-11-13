@@ -11,14 +11,18 @@ class StegoNet(object):
 
             # Embed message into image
             img_stack = tf.concat(axis=3, values=[img, msg])
+            img_stack = tf.identity(img_stack, name=collection + '_img_stack')
+
             conv0 = tf.contrib.layers.conv2d(
-                img_stack, 4, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+                img_stack, 4, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+            conv0 = tf.identity(conv0, name=collection + '_conv0')
 
             conv1 = tf.contrib.layers.conv2d(
-                conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+                conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+            conv1 = tf.identity(conv1, name=collection + '_conv1')
 
             conv2 = tf.contrib.layers.conv2d(
-                conv1, 3, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+                conv1, 3, 1, 1, 'SAME', activation_fn=tf.nn.relu)
 
             return tf.identity(conv2, name=collection + '_out')
 
@@ -29,13 +33,15 @@ class StegoNet(object):
                 variables_collections=[collection]):
 
             conv0 = tf.contrib.layers.conv2d(
-                img, 4, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+                img, 4, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+            conv0 = tf.identity(conv0, name=collection + '_conv0')
 
             conv1 = tf.contrib.layers.conv2d(
-                conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.sigmoid)
+                conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+            conv1 = tf.identity(conv1, name=collection + '_conv1')
 
             conv2 = tf.contrib.layers.conv2d(
-                conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
+                conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.relu)
 
             return tf.identity(conv2, name=collection + '_out')
 
@@ -106,7 +112,7 @@ class StegoNet(object):
             tf.abs(img_batch - alice_out), [1, 2, 3])
         self.bob_img_loss = tf.reduce_sum(bob_img_diff, name='img_loss')
         self.bob_bits_wrong = tf.reduce_sum(
-            tf.abs((bob_out + 1.) / 2. - (msg_batch + 1.) / 2.), [1])
+            tf.abs(bob_out - (msg_batch + 1.) / 2.), [1])
         self.bob_reconstruction_loss = tf.reduce_sum(
             self.bob_bits_wrong, name='bob_reconstruction_loss')
         # bob_eve_error_deviation = tf.abs(
