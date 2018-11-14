@@ -114,7 +114,7 @@ def train(cfg, model_dir, train_set, val_set):
     if current_epoch == 0:
         log_file = open(os.path.join(
             log_dir, cfg.MODEL_NAME + "_log.csv"), 'w')
-        log_file.write("epoch,bob_loss,eve_loss\n")
+        log_file.write("epoch,bob_loss,img_loss\n")
 
     # Restore meta graph if loading previous model
     if current_epoch != 0:
