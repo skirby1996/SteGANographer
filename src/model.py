@@ -14,11 +14,11 @@ class StegoNet(object):
             img_stack = tf.identity(img_stack, name=collection + '_img_stack')
 
             conv0 = tf.contrib.layers.conv2d(
-                img_stack, 4, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+                img_stack, 4, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
             conv0 = tf.identity(conv0, name=collection + '_conv0')
 
             conv1 = tf.contrib.layers.conv2d(
-                conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+                conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
             conv1 = tf.identity(conv1, name=collection + '_conv1')
 
             conv2 = tf.contrib.layers.conv2d(
@@ -33,15 +33,15 @@ class StegoNet(object):
                 variables_collections=[collection]):
 
             conv0 = tf.contrib.layers.conv2d(
-                img, 4, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+                img, 4, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
             conv0 = tf.identity(conv0, name=collection + '_conv0')
 
             conv1 = tf.contrib.layers.conv2d(
-                conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+                conv0, 4, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
             conv1 = tf.identity(conv1, name=collection + '_conv1')
 
             conv2 = tf.contrib.layers.conv2d(
-                conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.relu)
+                conv1, 1, 1, 1, 'SAME', activation_fn=tf.nn.tanh)
 
             return tf.identity(conv2, name=collection + '_out')
 
