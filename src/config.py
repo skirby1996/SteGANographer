@@ -13,8 +13,8 @@ class Config(object):
 
         self.LEARNING_RATE = 0.0008
         self.ITERS_PER_ACTOR = 1
-        self.ALICE_MULTIPLIER = 1  # Train alice_bob_optimizer x times each epoch
-        self.BOB_MULTIPLIER = 0  # Train bob_optimizer x times each epoch
+        self.ALICE_MULTIPLIER = 2  # Train alice_bob_optimizer x times each epoch
+        self.BOB_MULTIPLIER = 1  # Train bob_optimizer x times each epoch
 
         # Dataset parameters
         self.DATASET_NAME = "office"
