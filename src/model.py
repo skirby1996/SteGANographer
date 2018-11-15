@@ -112,7 +112,7 @@ class StegoNet(object):
             tf.abs(img_batch - alice_out), [1, 2, 3])
         self.bob_img_loss = tf.reduce_sum(bob_img_diff, name='img_loss')
         self.bob_bits_wrong = tf.reduce_sum(
-            tf.abs(bob_out - (msg_batch + 1.) / 2.), [1])
+            tf.square(bob_out - (msg_batch + 1.) / 2.), [1])
         self.bob_reconstruction_loss = tf.reduce_sum(
             self.bob_bits_wrong, name='bob_reconstruction_loss')
         # bob_eve_error_deviation = tf.abs(
